@@ -18,12 +18,15 @@
 #ifndef _BYTEBUFFER_H
 #define _BYTEBUFFER_H
 
-#include "ByteConverter.h"
 #include <array>
 #include <string>
 #include <vector>
 #include <cstring>
 #include <cstdint>
+
+#include "ByteConverter.h"
+
+class MessageBuffer;
 
 // Root of ByteBuffer exception hierarchy
 class ByteBufferException : public std::exception
@@ -86,6 +89,8 @@ class ByteBuffer
             _bitpos(buf._bitpos), _curbitval(buf._curbitval), _storage(buf.Move()) { }
 
         ByteBuffer(ByteBuffer const& right) = default;
+		
+		ByteBuffer(MessageBuffer&& buffer);
 
         std::vector<uint8_t>&& Move() noexcept
         {

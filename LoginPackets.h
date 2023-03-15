@@ -3,6 +3,10 @@
 
 #include <cstdint>
 
+enum Opcodes {
+	C2S_EDH_PubKey_Opcode = 0x02,
+};
+
 /**
  * Client Diffie-Hellman public number
  */

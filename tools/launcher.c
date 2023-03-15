@@ -1,6 +1,7 @@
 /**
  * Launch the main Client but swap the DSA public key used
- * to authenticate the Diffie-Hellman server exchange.
+ * to authenticate the Diffie-Hellman server exchange,
+ * as well as the server static DH public key.
  */
  
 #include <Windows.h>
@@ -69,6 +70,23 @@ char* find_addr(HANDLE hProc, const unsigned char *magic, SIZE_T magic_len) {
 }
 
 int find_replace(HANDLE hProc, const unsigned char *magic, size_t magic_len, const unsigned char *replacement, size_t replacement_len) {
+	char *match = find_addr(hProc, magic, magic_len);
+	if (!match) {
+		printf("Couldn't find match (%zu bytes)!\n", magic_len);
+		return -1;
+	}
+	printf("Found match at %p\n", match);
+
+	DWORD oldprotect;
+    if (!VirtualProtectEx(hProc, match, replacement_len, PAGE_EXECUTE_READWRITE, &oldprotect)) {
+		printf("Failed to vprotect, error code: %d\n", GetLastError());
+        return -1;
+	}
+    if (!WriteProcessMemory(hProc, match, replacement, replacement_len, NULL)) {
+        printf("Failed to write memory, error code: %d\n", GetLastError());
+        return -1;
+    }
+	VirtualProtectEx(hProc, match, replacement_len, oldprotect, &oldprotect);
 	return 0;
 }
 
@@ -94,45 +112,14 @@ int main(int argc, char* argv[]) {
     PROCESS_INFORMATION pi;
     if (!CreateProcess(NULL, (LPSTR)exePath, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi)) {
         printf("Failed to create process, error code: %d\n", GetLastError());
-        return 1;
+        return -1;
     }
-	
-	// Find & Replace the DSA public key
-	char *match = find_addr(pi.hProcess, dsa_asn1_pubkey_magic, sizeof(dsa_asn1_pubkey_magic));
-	if (!match) {
-		printf("Couldn't find match for DSA pubkey!\n");
-		return -1;
-	}
-	printf("Found DSA pubkey match at %p\n", match);
 
-	DWORD oldprotect;
-    if (!VirtualProtectEx(pi.hProcess, (LPVOID)match, PUB_KEY_LEN, PAGE_EXECUTE_READWRITE, &oldprotect)) {
-		printf("Failed to vprotect, error code: %d\n", GetLastError());
-        return -1;
-	}
-    if (!WriteProcessMemory(pi.hProcess, (LPVOID)match, pub_key, PUB_KEY_LEN, NULL)) {
-        printf("Failed to write memory, error code: %d\n", GetLastError());
-        return -1;
-    }
-	VirtualProtectEx(pi.hProcess, (LPVOID)match, PUB_KEY_LEN, oldprotect, &oldprotect);
-	
-	// Find & Replace the DH static pubkey
-	match = find_addr(pi.hProcess, server_dh_static_key_magic, sizeof(server_dh_static_key_magic));
-	if (!match) {
-		printf("Couldn't find match for static DH pubkey!\n");
+	// Overwrite DSA pubkey & DH static pubkey
+	if (find_replace(pi.hProcess, dsa_asn1_pubkey_magic, sizeof(dsa_asn1_pubkey_magic), pub_key, PUB_KEY_LEN))
 		return -1;
-	}
-	printf("Found DH static pubkey match at %p\n", match);
-
-    if (!VirtualProtectEx(pi.hProcess, (LPVOID)match, sizeof(new_server_dh_static_key), PAGE_EXECUTE_READWRITE, &oldprotect)) {
-		printf("Failed to vprotect, error code: %d\n", GetLastError());
-        return -1;
-	}
-    if (!WriteProcessMemory(pi.hProcess, (LPVOID)match, new_server_dh_static_key, sizeof(new_server_dh_static_key), NULL)) {
-        printf("Failed to write memory, error code: %d\n", GetLastError());
-        return -1;
-    }
-	VirtualProtectEx(pi.hProcess, (LPVOID)match, sizeof(new_server_dh_static_key), oldprotect, &oldprotect);
+	if (find_replace(pi.hProcess, server_dh_static_key_magic, sizeof(server_dh_static_key_magic), new_server_dh_static_key, sizeof(new_server_dh_static_key)))
+		return -1;
 
 	// Remove the coma state from the process
     ResumeThread(pi.hThread);
