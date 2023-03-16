@@ -8,6 +8,7 @@
 #include "Peer.h"
 #include "LoginPackets.h"
 #include "PacketHandlers.h"
+#include "types.h"
 #include "utils.h"
 
 using namespace std;
@@ -78,22 +79,22 @@ ByteBuffer handle_edh_pubkey(Peer *peer, const C2S_EDH_PubKey *client_key) {
 	puts("Shared secret:");
 	printPacket(shared.BytePtr(), shared.SizeInBytes());
 
-	CryptoPP::SHA512 hash;
-	CryptoPP::byte digest[CryptoPP::SHA512::DIGESTSIZE];
+	SHA512 hash;
+	CryptoPP::byte digest[SHA512::DIGESTSIZE];
 	hash.CalculateDigest(digest, shared.BytePtr(), shared.SizeInBytes());
 	peer->set_salsa20_creds(digest);
 
 	// Sign Ephemeral pubkey with DSA privkey
-	CryptoPP::DSA::Signer signer(dsa_priv_key);
-    CryptoPP::SecByteBlock signatureBlock(signer.MaxSignatureLength());
+	DSA::Signer signer(dsa_priv_key);
+    SecByteBlock signatureBlock(signer.MaxSignatureLength());
 	size_t signatureSize = signer.SignMessage(rnd, dh_eph_pub_key.BytePtr(), dh_eph_pub_key.SizeInBytes(), signatureBlock);
 
 	// Create answer packet
 	ByteBuffer packet;
-	packet << (uint16_t)EDH_PUBKEY;
-	packet << (uint16_t)dh_eph_pub_key.SizeInBytes();
+	packet << (u16)EDH_PUBKEY;
+	packet << (u16)dh_eph_pub_key.SizeInBytes();
 	packet.append(dh_eph_pub_key.BytePtr(), dh_eph_pub_key.SizeInBytes());
-	packet << (uint16_t)signatureSize;
+	packet << (u16)signatureSize;
 	packet.append(signatureBlock.BytePtr(), signatureSize);
 
 	return packet;
@@ -105,7 +106,7 @@ ByteBuffer handle_packet(Peer *peer, const std::vector<uint8_t> &data, std::size
 		return ret;
 	}
 	
-	uint16_t opcode = ntohs(*(uint16_t *)&data[0]);
+	u16 opcode = ntohs(*(u16 *)&data[0]);
 	switch (opcode) {
 	case EDH_PUBKEY:
 		C2S_EDH_PubKey *client_key = (C2S_EDH_PubKey *)&data[0];
