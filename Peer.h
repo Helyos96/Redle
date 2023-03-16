@@ -66,7 +66,7 @@ private:
 					printPacket(packet.data(), packet.size());
 					auto to_send = handle_packet(this, packet, length);
 					if (to_send.size() > 0) {
-						asio::async_write(socket_, asio::buffer(to_send.data(), to_send.size()),
+						asio::async_write(socket_, asio::buffer(to_send.contents(), to_send.size()),
 							[this, self](std::error_code ec, std::size_t /*length*/) {
 								if (!ec) {
 									do_read();

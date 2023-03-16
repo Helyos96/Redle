@@ -32,7 +32,7 @@ static void LoadPrivateKey(const string& filename, PrivateKey& key)
 	key.Load(queue);	
 }
 
-S2C_EDH_PubKey_Sig handle_edh_pubkey(Peer *peer, const C2S_EDH_PubKey *client_key) {
+ByteBuffer handle_edh_pubkey(Peer *peer, const C2S_EDH_PubKey *client_key) {
 	static const Integer p_eph("0xc5d1fff6e1e0b5b5a4220a369a4f504d59c7482724053c0d4b05426328031633bc79249c1c58c91b32e6802f20a1e7626859da201e7faad8406c702796cbdf3208a6cccb77baa29bec763a9a1fb868d79182f00957e890d762806b443e7fd2f75ef2eed5f56e92e5939ec15533a642b2212504b62ba72ca8e6c7fe28bbc8f687");
 	static const Integer g_eph("0x2");
 	static const Integer q_eph("0x62e8fffb70f05adad211051b4d27a826ace3a41392029e06a582a13194018b19de3c924e0e2c648d997340179050f3b1342ced100f3fd56c20363813cb65ef9904536665bbdd514df63b1d4d0fdc346bc8c17804abf4486bb14035a21f3fe97baf79776afab74972c9cf60aa99d321591092825b15d396547363ff145de47b43");
@@ -46,7 +46,7 @@ S2C_EDH_PubKey_Sig handle_edh_pubkey(Peer *peer, const C2S_EDH_PubKey *client_ke
 
 	AutoSeededRandomPool rnd;
 
-	// DSA Init
+	// DSA Init. Maybe should just ditch the file and hardcode the key in there.
 	CryptoPP::DSA::PrivateKey dsa_priv_key;
 	LoadPrivateKey("dsa-private.key", dsa_priv_key);
 	
@@ -54,7 +54,7 @@ S2C_EDH_PubKey_Sig handle_edh_pubkey(Peer *peer, const C2S_EDH_PubKey *client_ke
 		printf("Couldn't validate DSA privkey\n");
 	}
 
-	// DH Init
+	// DH Init. The parameters are set in stone and have been validated already.
 	DH dh_eph, dh_sta;
 	dh_eph.AccessGroupParameters().Initialize(p_eph, q_eph, g_eph);
 	dh_sta.AccessGroupParameters().Initialize(p_sta, q_sta, g_sta);
@@ -83,36 +83,33 @@ S2C_EDH_PubKey_Sig handle_edh_pubkey(Peer *peer, const C2S_EDH_PubKey *client_ke
 	hash.CalculateDigest(digest, shared.BytePtr(), shared.SizeInBytes());
 	peer->set_salsa20_creds(digest);
 
-	// Create packet
-	S2C_EDH_PubKey_Sig ret = { 0 };
-
-	ret.pid = htons(2);
-	ret.len = htons(128);
-	std::copy(dh_eph_pub_key.begin(), dh_eph_pub_key.end(), ret.pub_key);
-
-	// Sign the DH ephemeral pubkey with the DSA privkey
-	ret.len_sig = htons(56);
+	// Sign Ephemeral pubkey with DSA privkey
 	CryptoPP::DSA::Signer signer(dsa_priv_key);
     CryptoPP::SecByteBlock signatureBlock(signer.MaxSignatureLength());
-	size_t signatureSize = signer.SignMessage(rnd, ret.pub_key, sizeof(ret.pub_key), signatureBlock);
-	std::copy(signatureBlock.begin(), signatureBlock.begin() + signatureSize, ret.sig);
+	size_t signatureSize = signer.SignMessage(rnd, dh_eph_pub_key.BytePtr(), dh_eph_pub_key.SizeInBytes(), signatureBlock);
 
-	return ret;
+	// Create answer packet
+	ByteBuffer packet;
+	packet << (uint16_t)EDH_PUBKEY;
+	packet << (uint16_t)dh_eph_pub_key.SizeInBytes();
+	packet.append(dh_eph_pub_key.BytePtr(), dh_eph_pub_key.SizeInBytes());
+	packet << (uint16_t)signatureSize;
+	packet.append(signatureBlock.BytePtr(), signatureSize);
+
+	return packet;
 }
 
-std::vector<uint8_t> handle_packet(Peer *peer, const std::vector<uint8_t> &data, std::size_t length) {
-	std::vector<uint8_t> ret;
+ByteBuffer handle_packet(Peer *peer, const std::vector<uint8_t> &data, std::size_t length) {
+	ByteBuffer ret;
 	if (length < 2) {
 		return ret;
 	}
 	
-	uint16_t opcode = *(uint16_t *)&data[0];
-	opcode = ntohs(opcode);
+	uint16_t opcode = ntohs(*(uint16_t *)&data[0]);
 	switch (opcode) {
-	case C2S_EDH_PubKey_Opcode:
+	case EDH_PUBKEY:
 		C2S_EDH_PubKey *client_key = (C2S_EDH_PubKey *)&data[0];
-		auto to_send = handle_edh_pubkey(peer, client_key);
-		ret.insert(ret.end(), reinterpret_cast<uint8_t*>(&to_send), reinterpret_cast<uint8_t*>(&to_send) + sizeof(to_send));
+		ret = handle_edh_pubkey(peer, client_key);
 		break;
 	}
 	
