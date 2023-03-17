@@ -6,12 +6,15 @@ Redle is a generic ARPG server software.
 
 Handshaking and setting up the crypto stuff with the game client.
 
+## No downloads
+
+We do not offer prebuilt binaries.
+
 ## Building
 
-Note that Redle currently uses Windows APIs so it can only compile on that.
-Porting it to multiplatform is on the TODO list.
+So far compilation has only been tested on Windows, although the code should be multiplatform.
 
-Redle uses `[meson](https://mesonbuild.com/Quick-guide.html)` as the meta-build system.
+Redle uses [`meson`](https://mesonbuild.com/Quick-guide.html) as the meta-build system.
 
 You can generate `ninja` build files with it, or VSTUDIO solution files.
 
