@@ -13,11 +13,13 @@ We do not offer prebuilt binaries.
 
 ## Building
 
-So far compilation has only been tested on Windows, although the code should be multiplatform (except for the launcher and packet dumper tools).
+Dependencies:
+* [CryptoPP](https://github.com/weidai11/cryptopp) (tested with v8.7)
 
-Redle uses [`meson`](https://mesonbuild.com/Quick-guide.html) as the meta-build system.
+Redle is cross-platform, although only compilation under Windows and Linux (Ubuntu) have been tested.
+Some tools, like the launcher and packet dumper, are Windows-only.
 
-You can generate `ninja` build files with it, or VSTUDIO solution files.
+Redle uses [`meson`](https://mesonbuild.com/Quick-guide.html) as its meta-build system.
 
 ## Using
 
