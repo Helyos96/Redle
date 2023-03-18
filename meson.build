@@ -8,5 +8,6 @@ executable('testa', 'tools/test.cpp', dependencies : [cryptopp])
 
 if host_machine.system() == 'windows'
 	executable('launcher', 'tools/launcher.c')
+	executable('obs', 'tools/packet_dumper.c')
 endif
 

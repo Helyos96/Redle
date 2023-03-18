@@ -303,9 +303,10 @@ class ByteBuffer
 
         ByteBuffer &operator<<(std::string_view value)
         {
-            if (size_t len = value.length())
+            if (size_t len = value.length()) {
+				append<uint16_t>(len);
                 append(reinterpret_cast<uint8_t const*>(value.data()), len);
-            append(static_cast<uint8_t>(0));
+			}
             return *this;
         }
 

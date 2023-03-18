@@ -76,8 +76,6 @@ ByteBuffer handle_edh_pubkey(Peer *peer, const C2S_EDH_PubKey *client_key) {
 		printf("Failed to reach shared secret\n");
 		throw runtime_error("Failed to reach shared secret");
 	}
-	puts("Shared secret:");
-	printPacket(shared.BytePtr(), shared.SizeInBytes());
 
 	SHA512 hash;
 	CryptoPP::byte digest[SHA512::DIGESTSIZE];
@@ -100,6 +98,16 @@ ByteBuffer handle_edh_pubkey(Peer *peer, const C2S_EDH_PubKey *client_key) {
 	return packet;
 }
 
+void handle_auth_data(Peer *peer) {
+	S2C_Unk_0x04 unk;
+	S2C_Char_List cl;
+	S2C_League_List ll;
+	
+	peer->send_packet(unk);
+	peer->send_packet(cl);
+	peer->send_packet(ll);
+}
+
 ByteBuffer handle_packet(Peer *peer, const std::vector<uint8_t> &data, std::size_t length) {
 	ByteBuffer ret;
 	if (length < 2) {
@@ -108,9 +116,13 @@ ByteBuffer handle_packet(Peer *peer, const std::vector<uint8_t> &data, std::size
 	
 	u16 opcode = ntohs(*(u16 *)&data[0]);
 	switch (opcode) {
-	case EDH_PUBKEY:
+	case EDH_PUBKEY: {
 		C2S_EDH_PubKey *client_key = (C2S_EDH_PubKey *)&data[0];
 		ret = handle_edh_pubkey(peer, client_key);
+		break;
+	}
+	case C2S_AUTH_DATA:
+		handle_auth_data(peer);
 		break;
 	}
 	

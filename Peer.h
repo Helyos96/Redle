@@ -9,6 +9,7 @@
 #include "asio.hpp"
 using asio::ip::tcp;
 
+#include "Packet.h"
 #include "PacketHandlers.h"
 #include "utils.h"
 
@@ -34,9 +35,24 @@ public:
 	}
 	
 	void set_salsa20_creds(const unsigned char *buf) {
-		enc_.SetKeyWithIV(buf, 32, buf + 40, 8);
+		enc_.SetKeyWithIV(buf, 32, buf + 48, 8);
 		dec_.SetKeyWithIV(buf, 32, buf + 32, 8);
 		status_ = CryptoSetup;
+	}
+	
+	void send_packet(Packet &packet) {
+		std::vector<uint8_t> raw_packet;
+		printPacket(packet.data(), packet.size());
+		if (status_ != None) {
+			printf("Sending packet %u\n", packet.opcode());
+			raw_packet = encrypt_packet(packet.data(), packet.size());
+		} else {
+			printf("Sending packet %u (unencrypted)\n", packet.opcode());
+			raw_packet.insert(raw_packet.end(), packet.data(), packet.data() + packet.size());
+		}
+		asio::async_write(socket_, asio::buffer(raw_packet.data(), raw_packet.size()),
+			[/*this, self*/](std::error_code /*ec*/, std::size_t /*length*/) {
+			});
 	}
 
 private:
@@ -47,6 +63,13 @@ private:
 		std::vector<uint8_t> ret;
 		ret.resize(len);
 		dec_.ProcessData(&ret[0], raw_packet, len);
+		return ret;
+	}
+	
+	std::vector<uint8_t> encrypt_packet(const unsigned char *raw_packet, size_t len) {
+		std::vector<uint8_t> ret;
+		ret.resize(len);
+		enc_.ProcessData(&ret[0], raw_packet, len);
 		return ret;
 	}
 
@@ -67,14 +90,14 @@ private:
 					auto to_send = handle_packet(this, packet, length);
 					if (to_send.size() > 0) {
 						asio::async_write(socket_, asio::buffer(to_send.contents(), to_send.size()),
-							[this, self](std::error_code ec, std::size_t /*length*/) {
-								if (!ec) {
+							[/*this, self*/](std::error_code /*ec*/, std::size_t /*length*/) {
+								/*if (!ec) {
 									do_read();
-								}
+								}*/
 							});
-					} else {
-						do_read();
-					}
+					}// else {
+					do_read();
+					//}
 				}
 			}
 		);
