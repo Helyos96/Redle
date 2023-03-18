@@ -4,7 +4,7 @@
 
 #include "utils.h"
 
-void printPacket(const uint8_t *buffer, uint32_t size)
+void printPacket(const uint8_t *buffer, size_t size)
 {
 #define ppMIN(a, b)       ((a) < (b) ? (a) : (b))
 	char* stringbuffer = new char[size+2048]; // 256 bytes for the message around it.

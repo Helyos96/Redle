@@ -38,9 +38,8 @@ public:
 
 class S2C_Char_List : public Packet {
 public:
-	S2C_Char_List()
-		: Packet(S2C_CHAR_LIST) {
-		buffer << (u8)1; // Amount of characters
+	S2C_Char_List() : Packet(S2C_CHAR_LIST) {
+		buffer << (u8)1; // Character count
 		buffer << "TestChar";
 		buffer << "Standard";
 		buffer << (u32)0x020460b9;
@@ -56,10 +55,9 @@ public:
 
 class S2C_League_List : public Packet {
 public:
-	S2C_League_List()
-		: Packet(S2C_LEAGUE_LIST) {
+	S2C_League_List() : Packet(S2C_LEAGUE_LIST) {
 		buffer << (u64)0x520d166400000000;
-		buffer << (u32)1; // league amount?
+		buffer << (u32)1; // League count
 
 		buffer << "Standard";
 		buffer << "#LeagueStandard";
@@ -79,8 +77,7 @@ public:
 
 class S2C_Unk_0x04 : public Packet {
 public:
-	S2C_Unk_0x04()
-		: Packet(S2C_UNK_0x04) {
+	S2C_Unk_0x04() : Packet(S2C_UNK_0x04) {
 		buffer << (u16)0;
 		buffer << (u16)0;
 		u8 zeros[32] = { 0 };

@@ -1,3 +1,10 @@
+/**
+ * Scuffed Packet Dumper
+ * It only prints Server->Client packets
+ * It prints them in the same way that they are deserialized (sort of)
+ * It hangs the game when there is an instance switch
+ */
+
 #include <Windows.h>
 #include <stdio.h>
 #include <Psapi.h>
@@ -41,11 +48,8 @@ typedef struct Breakpoint
 {
 	BYTE old_instruction;
 	LPVOID address;
-}
+} Breakpoint;
 
-Breakpoint;
-
-static
 const BYTE int3 = 0xCC;	// INT 3
 #define GET_BYTES_OFFSET 0x162c6d2
 #define GET_BYTES_2_OFFSET 0x162C6BC
@@ -53,8 +57,7 @@ const BYTE int3 = 0xCC;	// INT 3
 
 Breakpoint set_breakpoint(HANDLE process, LPVOID address)
 {
-	Breakpoint bp = {.address = address
-	};
+	Breakpoint bp = { .address = address };
 
 	DWORD old_protection;
 
@@ -184,7 +187,6 @@ int reset_breakpoint(HANDLE process, HANDLE thread, DEBUG_EVENT *debug_event, CO
 
 int main()
 {
-	// Attach a debugger to an active process
 	DWORD pid = get_process_id_by_name("PathOfExile.exe");
 	if (!pid)
 	{
@@ -224,7 +226,6 @@ int main()
 
 	printf("Debugger attached to process %d.\n", pid);
 
-	// Set a breakpoint at offset 0x162c5c0 (get_bytes)
 	Breakpoint bp_get_bytes = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + GET_BYTES_OFFSET));
 	Breakpoint bp_get_bytes_2 = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + GET_BYTES_2_OFFSET));
 	Breakpoint bp_deserialize = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + DESERIALISE_OFFSET));
@@ -245,7 +246,7 @@ int main()
 			case EXCEPTION_DEBUG_EVENT:
 				if (debug_event.u.Exception.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT)
 				{
-				 		//printf("Breakpoint hit at address %p\n", debug_event.u.Exception.ExceptionRecord.ExceptionAddress);
+				 	//printf("Breakpoint hit at address %p\n", debug_event.u.Exception.ExceptionRecord.ExceptionAddress);
 					if (debug_event.u.Exception.ExceptionRecord.ExceptionAddress == bp_get_bytes.address)
 					{
 						HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, debug_event.dwThreadId);
@@ -255,7 +256,6 @@ int main()
 							return 1;
 						}
 
-						// Retrieve the value of the process' register R8
 						CONTEXT context;
 						context.ContextFlags = CONTEXT_INTEGER | CONTEXT_CONTROL;
 						if (!GetThreadContext(thread, &context))
@@ -267,7 +267,7 @@ int main()
 						//printf("Size: %lld\n", context.R8);
 						//printf("Address: 0x%016llX\n", context.Rdx);
 						continue_status = DBG_CONTINUE;
-						// Read bytes at the address contained in RDX
+						// Read bytes at the address contained in RDX, size R8
 						BYTE buffer[32000];
 						SIZE_T bytes_read;
 						if (!ReadProcessMemory(process, (LPCVOID) context.Rdx, buffer, context.R8, &bytes_read))
@@ -278,7 +278,7 @@ int main()
 
 						if (bytes_read != context.R8)
 						{
-							printf("ups size\n");
+							printf("size mismatch %llu %llu\n", bytes_read, context.R8);
 						}
 
 						if (bytes_read > 1 && last_was_one)

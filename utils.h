@@ -3,6 +3,6 @@
 
 #include <cstdint>
 
-void printPacket(const uint8_t *buffer, uint32_t size);
+void printPacket(const uint8_t *buffer, size_t size);
 
 #endif
