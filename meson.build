@@ -1,13 +1,10 @@
 project('redle', ['c', 'cpp'], default_options : ['cpp_std=c++20'])
 
 cryptopp = dependency('cryptopp')
+incdir = include_directories('dep')
 
-executable('redle', 'main.cpp', 'PacketHandlers.cpp', 'utils.cpp', 'ByteBuffer.cpp', 'fmt/format.cc', 'fmt/os.cc', dependencies : [cryptopp])
-executable('dsa_key_gen', 'tools/dsa_key_gen.cpp', dependencies : [cryptopp])
-executable('testa', 'tools/test.cpp', dependencies : [cryptopp])
+fmt_lib = static_library('fmt', sources : ['dep/fmt/format.cc', 'dep/fmt/os.cc'])
+fmt_dep = declare_dependency(link_with : fmt_lib)
 
-if host_machine.system() == 'windows'
-	executable('launcher', 'tools/launcher.c')
-	executable('obs', 'tools/packet_dumper.c')
-endif
-
+subdir('tools')
+subdir('src')
