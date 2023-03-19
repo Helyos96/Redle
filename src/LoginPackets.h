@@ -7,6 +7,7 @@
 #include "types.h"
 
 enum Opcodes : u16 {
+	C2S_HEARTBEAT = 0x01,
 	EDH_PUBKEY = 0x02,
 	C2S_AUTH_DATA = 0x03,
 	S2C_UNK_0x04 = 0x04,
@@ -104,7 +105,7 @@ public:
 		buffer << (u32)0x7F000001; // IPv4 127.0.0.1
 		u8 zeros[20] = { 0 };
 		buffer.append(zeros, sizeof(zeros));
-		u8 sha512[64] = { 0 }; // New SHA512 to derive Salsa20 key+IVs to communicate with gameserver
+		u8 sha512[64] = { 0 }; // New SHA512 to derive Salsa20 key+IVs to communicate with gameserver?
 		buffer.append(sha512, sizeof(sha512));
 	}
 };

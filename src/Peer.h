@@ -10,30 +10,24 @@
 using asio::ip::tcp;
 
 #include "Packet.h"
-#include "PacketHandlers.h"
 #include "utils.h"
 
 class Peer : public std::enable_shared_from_this<Peer> {
 public:
-	typedef std::shared_ptr<Peer> pointer;
 	enum Status {
 		None,
 		CryptoSetup,
 		LoggedIn,
 	};
 
-	static pointer create(asio::io_context& io_context) {
-		return pointer(new Peer(io_context));
-	}
-
 	tcp::socket& socket() {
 		return socket_;
 	}
-	
+
 	void start() {
 		do_read();
 	}
-	
+
 	void set_salsa20_creds(const unsigned char *buf) {
 		enc_.SetKeyWithIV(buf, 32, buf + 48, 8);
 		dec_.SetKeyWithIV(buf, 32, buf + 32, 8);
@@ -44,10 +38,10 @@ public:
 		std::vector<uint8_t> raw_packet;
 		printPacket(packet.data(), packet.size());
 		if (status_ != None) {
-			printf("Sending packet %u\n", packet.opcode());
+			printf("Sending packet 0x%X\n", packet.opcode());
 			raw_packet = encrypt_packet(packet.data(), packet.size());
 		} else {
-			printf("Sending packet %u (unencrypted)\n", packet.opcode());
+			printf("Sending packet 0x%X (unencrypted)\n", packet.opcode());
 			raw_packet.insert(raw_packet.end(), packet.data(), packet.data() + packet.size());
 		}
 		asio::async_write(socket_, asio::buffer(raw_packet.data(), raw_packet.size()),
@@ -55,7 +49,7 @@ public:
 			});
 	}
 
-private:
+protected:
 	Peer(asio::io_context& io_context) : socket_(io_context), status_(None) {
 	}
 
@@ -65,7 +59,7 @@ private:
 		dec_.ProcessData(&ret[0], raw_packet, len);
 		return ret;
 	}
-	
+
 	std::vector<uint8_t> encrypt_packet(const unsigned char *raw_packet, size_t len) {
 		std::vector<uint8_t> ret;
 		ret.resize(len);
@@ -73,12 +67,13 @@ private:
 		return ret;
 	}
 
+	virtual ByteBuffer handle_packet(const std::vector<uint8_t> &data, std::size_t length) = 0;
+
 	void do_read()
 	{
 		auto self(shared_from_this());
 		socket_.async_read_some(asio::buffer(data_, max_length),
 			[this, self](std::error_code ec, std::size_t length) {
-				
 				if (!ec) {
 					std::vector<uint8_t> packet;
 					if (status_ != None) {
@@ -87,17 +82,13 @@ private:
 						packet.insert(packet.end(), data_, data_ + length);
 					}
 					printPacket(packet.data(), packet.size());
-					auto to_send = handle_packet(this, packet, length);
+					auto to_send = handle_packet(packet, length);
 					if (to_send.size() > 0) {
 						asio::async_write(socket_, asio::buffer(to_send.contents(), to_send.size()),
 							[/*this, self*/](std::error_code /*ec*/, std::size_t /*length*/) {
-								/*if (!ec) {
-									do_read();
-								}*/
 							});
-					}// else {
+					}
 					do_read();
-					//}
 				}
 			}
 		);
@@ -110,6 +101,30 @@ private:
 	Status status_;
 	CryptoPP::Salsa20::Encryption enc_;
 	CryptoPP::Salsa20::Decryption dec_;
+};
+
+class PeerLogin : public Peer {
+public:
+	typedef std::shared_ptr<Peer> pointer;
+	static pointer create(asio::io_context& io_context) {
+		return pointer(new PeerLogin(io_context));
+	}
+protected:
+	PeerLogin(asio::io_context& io_context) : Peer(io_context) {
+	}
+	ByteBuffer handle_packet(const std::vector<uint8_t> &data, std::size_t length) override;
+};
+
+class PeerInstance : public Peer {
+public:
+	typedef std::shared_ptr<Peer> pointer;
+	static pointer create(asio::io_context& io_context) {
+		return pointer(new PeerInstance(io_context));
+	}
+protected:
+	PeerInstance(asio::io_context& io_context) : Peer(io_context) {
+	}
+	ByteBuffer handle_packet(const std::vector<uint8_t> &data, std::size_t length) override;
 };
 
 #endif

@@ -7,7 +7,7 @@
 
 #include "Peer.h"
 #include "LoginPackets.h"
-#include "PacketHandlers.h"
+#include "LoginPacketHandlers.h"
 #include "types.h"
 #include "utils.h"
 
@@ -114,26 +114,3 @@ void handle_play_character(Peer *peer) {
 	peer->send_packet(ii);
 }
 
-ByteBuffer handle_packet(Peer *peer, const std::vector<uint8_t> &data, std::size_t length) {
-	ByteBuffer ret;
-	if (length < 2) {
-		return ret;
-	}
-	
-	u16 opcode = ntohs(*(u16 *)&data[0]);
-	switch (opcode) {
-	case EDH_PUBKEY: {
-		C2S_EDH_PubKey *client_key = (C2S_EDH_PubKey *)&data[0];
-		ret = handle_edh_pubkey(peer, client_key);
-		break;
-	}
-	case C2S_AUTH_DATA:
-		handle_auth_data(peer);
-		break;
-	case C2S_PLAY_CHARACTER:
-		handle_play_character(peer);
-		break;
-	}
-	
-	return ret;
-}

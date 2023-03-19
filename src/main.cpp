@@ -25,16 +25,14 @@ public:
 
 private:
 	void start_accept() {
-		Peer::pointer new_connection = Peer::create(io_context_);
+		PeerInstance::pointer new_connection = PeerInstance::create(io_context_);
 
 		acceptor_.async_accept(new_connection->socket(),
 			std::bind(&tcp_instance_server::handle_accept, this, new_connection, std::placeholders::_1));
 	}
 
-	void handle_accept(Peer::pointer new_connection, const asio::error_code& error) {
+	void handle_accept(PeerInstance::pointer new_connection, const asio::error_code& error) {
 		if (!error) {
-			unsigned char zeroes[64] = { 0 }; // Same thing that we send in S2C_Instance_Info for now
-			new_connection->set_salsa20_creds(zeroes);
 			new_connection->start();
 		}
 		start_accept();
@@ -53,13 +51,13 @@ public:
 
 private:
 	void start_accept() {
-		Peer::pointer new_connection = Peer::create(io_context_);
+		PeerLogin::pointer new_connection = PeerLogin::create(io_context_);
 
 		acceptor_.async_accept(new_connection->socket(),
 			std::bind(&tcp_login_server::handle_accept, this, new_connection, std::placeholders::_1));
 	}
 
-	void handle_accept(Peer::pointer new_connection, const asio::error_code& error) {
+	void handle_accept(PeerLogin::pointer new_connection, const asio::error_code& error) {
 		if (!error) {
 			new_connection->start();
 		}
