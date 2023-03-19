@@ -110,7 +110,8 @@ public:
 		buffer << (u32)0x7F000001; // IPv4 127.0.0.1
 		u8 zeros[20] = { 0 };
 		buffer.append(zeros, sizeof(zeros));
-		u8 sha512[64] = { 0 }; // New SHA512 to derive Salsa20 key+IVs to communicate with gameserver?
+		// New SHA512 to derive Salsa20 key+IVs to communicate with gameserver? If 0 it seems to disable encryption
+		u8 sha512[64] = { 0 };
 		buffer.append(sha512, sizeof(sha512));
 	}
 };

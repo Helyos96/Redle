@@ -6,5 +6,10 @@
 
 void handle_instance_login(Peer *peer) {
 	unsigned char zeroes[64] = { 0 }; // Same thing that we send in S2C_Instance_Info for now
-	peer->set_salsa20_creds(zeroes);
+	//peer->set_salsa20_creds(zeroes);
+
+	S2C_Unk_0x13 unk_0x13;
+	S2C_Unk_0x10 unk_0x10;
+	peer->send_packet(unk_0x13);
+	peer->send_packet(unk_0x10);
 }

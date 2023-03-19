@@ -36,12 +36,11 @@ public:
 	
 	void send_packet(Packet &packet) {
 		std::vector<uint8_t> raw_packet;
+		printf("[%s] Server -> Client (%zu)\n", server_type, packet.size());
 		printPacket(packet.data(), packet.size());
 		if (status_ != None) {
-			printf("Sending packet 0x%X\n", packet.opcode());
 			raw_packet = encrypt_packet(packet.data(), packet.size());
 		} else {
-			printf("Sending packet 0x%X (unencrypted)\n", packet.opcode());
 			raw_packet.insert(raw_packet.end(), packet.data(), packet.data() + packet.size());
 		}
 		asio::async_write(socket_, asio::buffer(raw_packet.data(), raw_packet.size()),
@@ -50,7 +49,7 @@ public:
 	}
 
 protected:
-	Peer(asio::io_context& io_context) : socket_(io_context), status_(None) {
+	Peer(asio::io_context& io_context, const char *server_type) : socket_(io_context), server_type(server_type), status_(None) {
 	}
 
 	std::vector<uint8_t> decrypt_packet(const unsigned char *raw_packet, size_t len) {
@@ -81,6 +80,7 @@ protected:
 					} else {
 						packet.insert(packet.end(), data_, data_ + length);
 					}
+					printf("[%s] Client -> Server (%zu)\n", server_type, packet.size());
 					printPacket(packet.data(), packet.size());
 					auto to_send = handle_packet(packet, length);
 					if (to_send.size() > 0) {
@@ -96,6 +96,7 @@ protected:
 
 	enum { max_length = 8192 };
 
+	const char *server_type;
 	tcp::socket socket_;
 	unsigned char data_[max_length];
 	Status status_;
@@ -110,7 +111,7 @@ public:
 		return pointer(new PeerLogin(io_context));
 	}
 protected:
-	PeerLogin(asio::io_context& io_context) : Peer(io_context) {
+	PeerLogin(asio::io_context& io_context) : Peer(io_context, "LOGIN") {
 	}
 	ByteBuffer handle_packet(const std::vector<uint8_t> &data, std::size_t length) override;
 };
@@ -122,7 +123,7 @@ public:
 		return pointer(new PeerInstance(io_context));
 	}
 protected:
-	PeerInstance(asio::io_context& io_context) : Peer(io_context) {
+	PeerInstance(asio::io_context& io_context) : Peer(io_context, "INSTANCE") {
 	}
 	ByteBuffer handle_packet(const std::vector<uint8_t> &data, std::size_t length) override;
 };

@@ -1,8 +1,7 @@
 /**
- * Scuffed Packet Dumper
- * It only prints Server->Client packets
+ * Packet Dumper
  * It prints them in the same way that they are deserialized (sort of)
- * It hangs the game when there is an instance switch
+ * Hangs sometimes, need to figure out why
  */
 
 #include <Windows.h>
@@ -51,9 +50,6 @@ typedef struct Breakpoint
 } Breakpoint;
 
 const BYTE int3 = 0xCC;	// INT 3
-#define GET_BYTES_OFFSET 0x162c6d2
-#define GET_BYTES_2_OFFSET 0x162C6BC
-#define DESERIALISE_OFFSET 0x1AE4710
 
 Breakpoint set_breakpoint(HANDLE process, LPVOID address)
 {
@@ -88,13 +84,19 @@ Breakpoint set_breakpoint(HANDLE process, LPVOID address)
 	return bp;
 }
 
-int reset_breakpoint(HANDLE process, HANDLE thread, DEBUG_EVENT *debug_event, CONTEXT *context, const Breakpoint *bp)
+int reset_breakpoint(HANDLE process, HANDLE thread, DEBUG_EVENT *debug_event, const Breakpoint *bp)
 {
+	CONTEXT context;
+	context.ContextFlags = CONTEXT_CONTROL;
+	if (!GetThreadContext(thread, &context)) {
+		printf("Failed to get thread context.\n");
+		return 1;
+	}
 	// Move back one byte to re-execute the original instruction
-	context->Rip -= 1;
+	context.Rip -= 1;
 	// Set the thread context to resume execution with a single step
-	context->EFlags |= 0x100;
-	if (!SetThreadContext(thread, context))
+	context.EFlags |= 0x100;
+	if (!SetThreadContext(thread, &context))
 	{
 		printf("Failed to set thread context. Error %u\n", GetLastError());
 		return 1;
@@ -185,6 +187,48 @@ int reset_breakpoint(HANDLE process, HANDLE thread, DEBUG_EVENT *debug_event, CO
 	return 0;
 }
 
+typedef struct StreamWatch {
+	char buf[8192];
+	size_t cur_idx;
+	int last_was_one;
+	size_t total_bytes;
+} StreamWatch;
+
+void push_bytes(StreamWatch *sw, const unsigned char *bytes, size_t len) {
+	size_t i;
+
+	if (len == 0)
+		return;
+
+	if (len > 1 && sw->last_was_one)
+		sw->cur_idx += snprintf(&sw->buf[sw->cur_idx], 8192 - sw->cur_idx, "\n");
+
+	for (i = 0; i < len; ++i)
+		sw->cur_idx += snprintf(&sw->buf[sw->cur_idx], 8192 - sw->cur_idx, "%02X ", bytes[i]);
+
+	if (len > 1) {
+		sw->cur_idx += snprintf(&sw->buf[sw->cur_idx], 8192 - sw->cur_idx, "\n");
+		sw->last_was_one = 0;
+	} else {
+		sw->last_was_one = 1;
+	}
+
+	sw->total_bytes += len;
+}
+
+void print_stream(StreamWatch *sw) {
+	printf("(%zu)\n", sw->total_bytes);
+	printf("%s\n", sw->buf);
+	memset(sw, 0, sizeof(StreamWatch));
+}
+
+// TODO: magic signatures rather than hard offsets
+#define GET_BYTES_OFFSET 0x162c6d2
+#define DESERIALISE_OFFSET 0x1AE4710
+
+#define WRITE_BYTES_OFFSET 0x162C700
+#define SEND_PACKET_OFFSET 0x162C860
+
 int main()
 {
 	DWORD pid = get_process_id_by_name("PathOfExile.exe");
@@ -196,10 +240,9 @@ int main()
 
 	HANDLE process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
 	DWORD lpcbNeeded;
-	int written_stuff = 0;
-	int last_was_one = 0;
-	int total_bytes = 0;
-	uint64_t total = 0;
+
+	StreamWatch read_stream = { 0 };
+	StreamWatch write_stream = { 0 };
 
 	// Retrieve the process' base address
 	MODULEINFO module_info;
@@ -227,8 +270,9 @@ int main()
 	printf("Debugger attached to process %d.\n", pid);
 
 	Breakpoint bp_get_bytes = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + GET_BYTES_OFFSET));
-	//Breakpoint bp_get_bytes_2 = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + GET_BYTES_2_OFFSET));
 	Breakpoint bp_deserialize = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + DESERIALISE_OFFSET));
+	Breakpoint bp_write_bytes = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + WRITE_BYTES_OFFSET));
+	Breakpoint bp_send_packet = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + SEND_PACKET_OFFSET));
 
 	// Wait for breakpoint
 	DEBUG_EVENT debug_event;
@@ -250,177 +294,97 @@ int main()
 					if (debug_event.u.Exception.ExceptionRecord.ExceptionAddress == bp_get_bytes.address)
 					{
 						HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, debug_event.dwThreadId);
-						if (!thread)
-						{
+						if (!thread) {
 							printf("Failed to open thread.\n");
 							return 1;
 						}
 
 						CONTEXT context;
-						context.ContextFlags = CONTEXT_INTEGER | CONTEXT_CONTROL;
-						if (!GetThreadContext(thread, &context))
-						{
+						context.ContextFlags = CONTEXT_INTEGER;
+						if (!GetThreadContext(thread, &context)) {
 							printf("Failed to get thread context.\n");
 							return 1;
 						}
 
-						//printf("Size: %lld\n", context.R8);
-						//printf("Address: 0x%016llX\n", context.Rdx);
 						continue_status = DBG_CONTINUE;
 						// Read bytes at the address contained in RDX, size R8
 						BYTE buffer[32000];
-						SIZE_T bytes_read;
-						if (!ReadProcessMemory(process, (LPCVOID) context.Rdx, buffer, context.R8, &bytes_read))
-						{
+						size_t bytes_read;
+						if (!ReadProcessMemory(process, (LPCVOID) context.Rdx, buffer, context.R8, &bytes_read)) {
 							printf("Failed to read memory.\n");
 							return 1;
 						}
 
 						if (bytes_read != context.R8)
-						{
 							printf("size mismatch %llu %llu\n", bytes_read, context.R8);
-						}
 
-						if (bytes_read > 1 && last_was_one)
-						{
-							printf("\n");
-						}
-
-						for (int i = 0; i < bytes_read; i++)
-						{
-							printf("%02X ", buffer[i]);
-						}
-
-						if (bytes_read > 1)
-						{
-							printf("\n");
-							last_was_one = 0;
-						}
-						else
-						{
-							last_was_one = 1;
-						}
-
-						total_bytes += bytes_read;
-						reset_breakpoint(process, thread, &debug_event, &context, &bp_get_bytes);
-						written_stuff = 1;
+						push_bytes(&read_stream, buffer, bytes_read);
+						reset_breakpoint(process, thread, &debug_event, &bp_get_bytes);
 						CloseHandle(thread);
 					}
-					/*else if (debug_event.u.Exception.ExceptionRecord.ExceptionAddress == bp_get_bytes_2.address)
+					else if (debug_event.u.Exception.ExceptionRecord.ExceptionAddress == bp_write_bytes.address)
 					{
-						printf("HIT!\n");
 						HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, debug_event.dwThreadId);
-						if (!thread)
-						{
+						if (!thread) {
 							printf("Failed to open thread.\n");
 							return 1;
 						}
 
-						// Retrieve the value of the process' register R8
 						CONTEXT context;
-						context.ContextFlags = CONTEXT_INTEGER | CONTEXT_CONTROL;
-						if (!GetThreadContext(thread, &context))
-						{
+						context.ContextFlags = CONTEXT_INTEGER;
+						if (!GetThreadContext(thread, &context)) {
 							printf("Failed to get thread context.\n");
 							return 1;
 						}
 
-						//printf("Size: %lld\n", context.R8);
-						//printf("Address: 0x%016llX\n", context.Rdx);
 						continue_status = DBG_CONTINUE;
-						// Read bytes at the address contained in RDX
+						// Read bytes at the address contained in RDX, size R8
 						BYTE buffer[32000];
-						SIZE_T bytes_read;
-						if (!ReadProcessMemory(process, (LPCVOID) context.Rdx, buffer, context.R8, &bytes_read))
-						{
+						size_t bytes_read;
+						if (!ReadProcessMemory(process, (LPCVOID) context.Rdx, buffer, context.R8, &bytes_read)) {
 							printf("Failed to read memory.\n");
 							return 1;
 						}
 
 						if (bytes_read != context.R8)
-						{
-							printf("ups size\n");
-						}
+							printf("size mismatch %llu %llu\n", bytes_read, context.R8);
 
-						if (bytes_read > 1 && last_was_one)
-						{
-							printf("\n");
-						}
-
-						for (int i = 0; i < bytes_read; i++)
-						{
-							printf("%02X ", buffer[i]);
-						}
-
-						if (bytes_read > 1)
-						{
-							printf("\n");
-							last_was_one = 0;
-						}
-						else
-						{
-							last_was_one = 1;
-						}
-
-						total_bytes += bytes_read;
-						reset_breakpoint(process, thread, &debug_event, &context, &bp_get_bytes_2);
-						written_stuff = 1;
+						push_bytes(&write_stream, buffer, bytes_read);
+						reset_breakpoint(process, thread, &debug_event, &bp_write_bytes);
 						CloseHandle(thread);
-					}*/
+					}
 					else if (debug_event.u.Exception.ExceptionRecord.ExceptionAddress == bp_deserialize.address)
 					{
-						if (total_bytes > 0)
-						{
-							printf("(Size %u)\n", total_bytes);
-							total_bytes = 0;
-						}
-
-						if (written_stuff)
-						{
-							printf("\n\n");
-							written_stuff = 0;
+						if (read_stream.total_bytes > 0) {
+							printf("Server -> Client ");
+							print_stream(&read_stream);
+							printf("\n");
 						}
 
 						HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, debug_event.dwThreadId);
-						if (!thread)
-						{
+						if (!thread) {
 							printf("Failed to open thread.\n");
 							return 1;
 						}
 
-						CONTEXT context;
-						context.ContextFlags = CONTEXT_INTEGER | CONTEXT_CONTROL;
-						if (!GetThreadContext(thread, &context))
-						{
-							printf("Failed to get thread context.\n");
+						reset_breakpoint(process, thread, &debug_event, &bp_deserialize);
+						CloseHandle(thread);
+					}
+					else if (debug_event.u.Exception.ExceptionRecord.ExceptionAddress == bp_send_packet.address)
+					{
+						if (write_stream.total_bytes > 0) {
+							printf("Client -> Server ");
+							print_stream(&write_stream);
+							printf("\n");
+						}
+
+						HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, debug_event.dwThreadId);
+						if (!thread) {
+							printf("Failed to open thread.\n");
 							return 1;
 						}
 
-						uint64_t packet_object = context.Rdx;
-
-						uint8_t pkt[4096];
-						uint64_t po_416_size;
-						uint64_t po_424;
-						uint64_t po_456;
-						uint64_t po_464;
-						SIZE_T bytes_read;
-						ReadProcessMemory(process, packet_object + 416, &po_416_size, sizeof(po_416_size), &bytes_read);
-						ReadProcessMemory(process, packet_object + 424, &po_424, sizeof(po_424), &bytes_read);
-						ReadProcessMemory(process, packet_object + 456, &po_456, sizeof(po_456), &bytes_read);
-						ReadProcessMemory(process, packet_object + 464, &po_464, sizeof(po_464), &bytes_read);
-						ReadProcessMemory(process, po_456 + total, pkt, po_416_size, &bytes_read);
-
-						if (po_416_size > 0)
-						{
-							total += po_416_size;
-							/*printf("0x%llX 0x%llX 0x%llX 0x%llX\n", po_416_size, po_424, po_456, po_464);
-							for (int i = 0; i < po_416_size; i++) { 	printf("%02X ", pkt[i]);
-							}
-
-							printf("\n"); */
-						}
-
-						reset_breakpoint(process, thread, &debug_event, &context, &bp_deserialize);
+						reset_breakpoint(process, thread, &debug_event, &bp_send_packet);
 						CloseHandle(thread);
 					}
 				}

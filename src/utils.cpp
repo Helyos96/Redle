@@ -7,11 +7,10 @@
 void printPacket(const uint8_t *buffer, size_t size)
 {
 #define ppMIN(a, b)       ((a) < (b) ? (a) : (b))
-	char* stringbuffer = new char[size+2048]; // 256 bytes for the message around it.
-	memset(stringbuffer, 0, (size + 2048 )* sizeof(char));
+	char* stringbuffer = new char[size+16384]; // 256 bytes for the message around it.
+	memset(stringbuffer, 0, (size + 16384 )* sizeof(char));
 
 	unsigned int i;
-	sprintf(stringbuffer + strlen(stringbuffer), "Printing packet with size %u\n", size);
    
 	for(i = 0; i < size; ++i) {
 		if(i != 0&& i%16 == 0) {
