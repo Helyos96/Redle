@@ -10,6 +10,8 @@ enum Opcodes : u16 {
 	EDH_PUBKEY = 0x02,
 	C2S_AUTH_DATA = 0x03,
 	S2C_UNK_0x04 = 0x04,
+	C2S_PLAY_CHARACTER = 0x0D,
+	S2C_INSTANCE_INFO = 0x13,
 	S2C_CHAR_LIST = 0x14,
 	S2C_LEAGUE_LIST = 0x19
 };
@@ -40,9 +42,12 @@ class S2C_Char_List : public Packet {
 public:
 	S2C_Char_List() : Packet(S2C_CHAR_LIST) {
 		buffer << (u8)1; // Character count
+
 		buffer << "TestChar";
 		buffer << "Standard";
-		buffer << (u32)0x020460b9;
+		buffer << (u16)0x0204;
+		buffer << (u8)100; // level
+		buffer << (u8)0xB9;
 		buffer << (u32)0xa2bd34c4;
 		buffer << (u16)0;
 		buffer << (u16)0;
@@ -84,6 +89,23 @@ public:
 		buffer.append(zeros, sizeof(zeros));
 		buffer << (u8)0x22;
 		buffer << "AccountName";
+	}
+};
+
+class S2C_Instance_Info : public Packet {
+public:
+	S2C_Instance_Info() : Packet(S2C_INSTANCE_INFO) {
+		buffer << (u32)0x00000001; // Token? Echoed in OpcodesInstance::C2S_LOGIN
+		buffer << (u16)0x235C;
+		buffer << (u32)0x00000002; // Another Token? Echoed in OpcodesInstance::C2S_LOGIN
+		buffer << (u8)1;
+		buffer << (u16)0x200;
+		buffer << (u16)6112; // port
+		buffer << (u32)0x7F000001; // IPv4 127.0.0.1
+		u8 zeros[20] = { 0 };
+		buffer.append(zeros, sizeof(zeros));
+		u8 sha512[64] = { 0 }; // New SHA512 to derive Salsa20 key+IVs to communicate with gameserver
+		buffer.append(sha512, sizeof(sha512));
 	}
 };
 

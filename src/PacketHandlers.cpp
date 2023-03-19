@@ -108,6 +108,12 @@ void handle_auth_data(Peer *peer) {
 	peer->send_packet(ll);
 }
 
+void handle_play_character(Peer *peer) {
+	S2C_Instance_Info ii;
+
+	peer->send_packet(ii);
+}
+
 ByteBuffer handle_packet(Peer *peer, const std::vector<uint8_t> &data, std::size_t length) {
 	ByteBuffer ret;
 	if (length < 2) {
@@ -123,6 +129,9 @@ ByteBuffer handle_packet(Peer *peer, const std::vector<uint8_t> &data, std::size
 	}
 	case C2S_AUTH_DATA:
 		handle_auth_data(peer);
+		break;
+	case C2S_PLAY_CHARACTER:
+		handle_play_character(peer);
 		break;
 	}
 	

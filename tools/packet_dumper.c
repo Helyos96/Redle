@@ -227,7 +227,7 @@ int main()
 	printf("Debugger attached to process %d.\n", pid);
 
 	Breakpoint bp_get_bytes = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + GET_BYTES_OFFSET));
-	Breakpoint bp_get_bytes_2 = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + GET_BYTES_2_OFFSET));
+	//Breakpoint bp_get_bytes_2 = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + GET_BYTES_2_OFFSET));
 	Breakpoint bp_deserialize = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + DESERIALISE_OFFSET));
 
 	// Wait for breakpoint
@@ -306,7 +306,7 @@ int main()
 						written_stuff = 1;
 						CloseHandle(thread);
 					}
-					else if (debug_event.u.Exception.ExceptionRecord.ExceptionAddress == bp_get_bytes_2.address)
+					/*else if (debug_event.u.Exception.ExceptionRecord.ExceptionAddress == bp_get_bytes_2.address)
 					{
 						printf("HIT!\n");
 						HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, debug_event.dwThreadId);
@@ -366,7 +366,7 @@ int main()
 						reset_breakpoint(process, thread, &debug_event, &context, &bp_get_bytes_2);
 						written_stuff = 1;
 						CloseHandle(thread);
-					}
+					}*/
 					else if (debug_event.u.Exception.ExceptionRecord.ExceptionAddress == bp_deserialize.address)
 					{
 						if (total_bytes > 0)
