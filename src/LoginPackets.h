@@ -10,10 +10,15 @@ enum Opcodes : u16 {
 	C2S_HEARTBEAT = 0x01,
 	EDH_PUBKEY = 0x02,
 	C2S_AUTH_DATA = 0x03,
-	S2C_UNK_0x04 = 0x04,
+	C2S_CHANGE_PASSWORD = 0x09,
+	C2S_DELETE_CHARACTER = 0x0B,
 	C2S_PLAY_CHARACTER = 0x0D,
+	C2S_CREATE_CHARACTER = 0x11,
+	C2S_LEAGUE_MIGRATIONS = 0x17,
+
+	S2C_UNK_0x04 = 0x04,
 	S2C_INSTANCE_INFO = 0x13,
-	S2C_CHAR_LIST = 0x14,
+	S2C_CHARACTER_LIST = 0x14,
 	S2C_LEAGUE_LIST = 0x19
 };
 
@@ -41,7 +46,7 @@ public:
 
 class S2C_Char_List : public Packet {
 public:
-	S2C_Char_List() : Packet(S2C_CHAR_LIST) {
+	S2C_Char_List() : Packet(S2C_CHARACTER_LIST) {
 		buffer << (u8)1; // Character count
 
 		buffer << "TestChar";

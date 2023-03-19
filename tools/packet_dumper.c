@@ -427,15 +427,18 @@ int main()
 				else
 				{
 				 	//printf("Outer Got other ExceptionCode %u 0x%08X\n", debug_event.dwDebugEventCode, debug_event.u.Exception.ExceptionRecord.ExceptionCode);
-					continue_status = DBG_CONTINUE;
+					continue_status = DBG_EXCEPTION_NOT_HANDLED;
 				}
 
 				break;
 			case CREATE_THREAD_DEBUG_EVENT:
 				//printf("CREATE_THREAD_DEBUG_EVENT.\n");
+				CloseHandle(debug_event.u.CreateThread.hThread);
 				continue_status = DBG_CONTINUE;
 				break;
 			case CREATE_PROCESS_DEBUG_EVENT:
+				//printf("CREATE_PROCESS_DEBUG_EVENT.\n");
+				CloseHandle(debug_event.u.CreateProcessInfo.hFile);
 				continue_status = DBG_CONTINUE;
 				break;
 			case EXIT_THREAD_DEBUG_EVENT:
@@ -446,6 +449,7 @@ int main()
 				break;
 			case LOAD_DLL_DEBUG_EVENT:
 				//printf("LOAD_DLL_DEBUG_EVENT.\n");
+				CloseHandle(debug_event.u.LoadDll.hFile);
 				continue_status = DBG_CONTINUE;
 				break;
 			case UNLOAD_DLL_DEBUG_EVENT:
@@ -461,15 +465,16 @@ int main()
 				continue_status = DBG_CONTINUE;
 				break;
 			default:
+				printf("Unhandled event 0x%08X\n", debug_event.dwDebugEventCode);
 				continue_status = DBG_EXCEPTION_NOT_HANDLED;
 				break;
 		}
-
 		if (!ContinueDebugEvent(debug_event.dwProcessId, debug_event.dwThreadId, continue_status))
 		{
 			printf("Failed to continue debug event.\n");
 			return 1;
 		}
+		continue_status = DBG_CONTINUE;
 	}
 
 	printf("Out of loop!\n");

@@ -7,6 +7,6 @@
 #include "InstancePackets.h"
 class Peer;
 
-void handle_login(Peer *peer);
+void handle_instance_login(Peer *peer);
 
 #endif

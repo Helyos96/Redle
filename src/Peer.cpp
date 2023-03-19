@@ -41,7 +41,7 @@ ByteBuffer PeerInstance::handle_packet(const std::vector<uint8_t> &data, std::si
 	u16 opcode = ntohs(*(u16 *)&data[0]);
 	switch (opcode) {
 	case C2S_LOGIN:
-		handle_login(this);
+		handle_instance_login(this);
 		break;
 	default:
 		printf("Unhandled instance opcode: 0x%X\n", opcode);
