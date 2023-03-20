@@ -1,7 +1,6 @@
 /**
  * Packet Dumper
  * It prints them in the same way that they are deserialized (sort of)
- * Hangs sometimes, need to figure out why
  */
 
 #include <Windows.h>
@@ -188,7 +187,7 @@ int reset_breakpoint(HANDLE process, HANDLE thread, DEBUG_EVENT *debug_event, co
 }
 
 typedef struct StreamWatch {
-	char buf[8192];
+	char buf[65536];
 	size_t cur_idx;
 	int last_was_one;
 	size_t total_bytes;
@@ -201,13 +200,13 @@ void push_bytes(StreamWatch *sw, const unsigned char *bytes, size_t len) {
 		return;
 
 	if (len > 1 && sw->last_was_one)
-		sw->cur_idx += snprintf(&sw->buf[sw->cur_idx], 8192 - sw->cur_idx, "\n");
+		sw->cur_idx += snprintf(&sw->buf[sw->cur_idx], sizeof(sw->buf) - 1 - sw->cur_idx, "\n");
 
 	for (i = 0; i < len; ++i)
-		sw->cur_idx += snprintf(&sw->buf[sw->cur_idx], 8192 - sw->cur_idx, "%02X ", bytes[i]);
+		sw->cur_idx += snprintf(&sw->buf[sw->cur_idx], sizeof(sw->buf) - 1 - sw->cur_idx, "%02X ", bytes[i]);
 
 	if (len > 1) {
-		sw->cur_idx += snprintf(&sw->buf[sw->cur_idx], 8192 - sw->cur_idx, "\n");
+		sw->cur_idx += snprintf(&sw->buf[sw->cur_idx], sizeof(sw->buf) - 1 - sw->cur_idx, "\n");
 		sw->last_was_one = 0;
 	} else {
 		sw->last_was_one = 1;
@@ -390,7 +389,7 @@ int main()
 				}
 				else
 				{
-				 	//printf("Outer Got other ExceptionCode %u 0x%08X\n", debug_event.dwDebugEventCode, debug_event.u.Exception.ExceptionRecord.ExceptionCode);
+					//printf("Outer Got other ExceptionCode %u 0x%08X\n", debug_event.dwDebugEventCode, debug_event.u.Exception.ExceptionRecord.ExceptionCode);
 					continue_status = DBG_EXCEPTION_NOT_HANDLED;
 				}
 
