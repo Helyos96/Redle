@@ -184,21 +184,18 @@ cc = meson.get_compiler('c')
 host_cpu_family = host_machine.cpu_family()
 
 sources_cryptopp_asm = []
-if host_cpu_family == 'x86'
-	sources_cryptopp_asm += ['rdrand.asm', 'rdseed.asm']
-elif host_cpu_family == 'x86_64'
-	sources_cryptopp_asm += ['rdrand.asm', 'rdseed.asm', 'x64dll.asm', 'x64masm.asm']
-endif
 
 if cc.get_argument_syntax() == 'msvc'
   cl = find_program('cl')
   if host_cpu_family.startswith('x86')
     if host_cpu_family == 'x86'
+      sources_cryptopp_asm += ['rdrand.asm', 'rdseed.asm']
       ml = find_program('ml')
-	  assembler_args = [ml, '/Fo', '@OUTPUT@', '/c', '/D_M_X86', '/W3', '/Cx', '@INPUT@']
+      assembler_args = [ml, '/Fo', '@OUTPUT@', '/c', '/D_M_X86', '/W3', '/Cx', '@INPUT@']
     elif host_cpu_family == 'x86_64'
+      sources_cryptopp_asm += ['rdrand.asm', 'rdseed.asm', 'x64dll.asm', 'x64masm.asm']
       ml = find_program('ml64')
-	  assembler_args = [ml, '/Fo', '@OUTPUT@', '/c', '/D_M_X64', '/W3', '/Cx', '@INPUT@']
+      assembler_args = [ml, '/Fo', '@OUTPUT@', '/c', '/D_M_X64', '/W3', '/Cx', '@INPUT@']
     else
       error('Unknown cpu_family: ' + host_cpu_family)
     endif
@@ -224,5 +221,15 @@ if cc.get_argument_syntax() == 'msvc'
   sources_cryptopp_asm = ffi_asm_objs
 endif
 
-cryptopp_lib = static_library('cryptopp', sources : [sources_cryptopp, sources_cryptopp_asm])
+# TODO: Actually try and detect SIMD instructions. For now be conservative and disable AVX/AVX2/AES/SHA
+cryptopp_cpp_args = []
+if cc.get_argument_syntax() == 'gcc' and host_cpu_family.startswith('x86')
+  if host_cpu_family == 'x86'
+    cryptopp_cpp_args += [ '-msse2', '-msse3', '-mssse3', '-DCRYPTOPP_DISABLE_SSE4', '-DCRYPTOPP_DISABLE_AVX', '-DCRYPTOPP_DISABLE_AVX2', '-DCRYPTOPP_DISABLE_AESNI', '-DCRYPTOPP_DISABLE_CLMUL', '-DCRYPTOPP_DISABLE_SHANI' ]
+  elif host_cpu_family == 'x86_64'
+    cryptopp_cpp_args += [ '-msse2', '-msse3', '-mssse3', '-msse4.1', '-msse4.2', '-DCRYPTOPP_DISABLE_AVX', '-DCRYPTOPP_DISABLE_AVX2', '-DCRYPTOPP_DISABLE_AESNI', '-DCRYPTOPP_DISABLE_CLMUL', '-DCRYPTOPP_DISABLE_SHANI' ]
+  endif
+endif
+
+cryptopp_lib = static_library('cryptopp', sources : [sources_cryptopp, sources_cryptopp_asm], cpp_args : cryptopp_cpp_args)
 cryptopp = declare_dependency(link_with : cryptopp_lib)
