@@ -1,6 +1,7 @@
 /**
  * Packet Dumper
  * It prints them in the same way that they are deserialized (sort of)
+ * Note: Sometimes, big packets will be shown first in partial state, then in full.
  */
 
 #include <Windows.h>
@@ -175,7 +176,7 @@ int reset_breakpoint(HANDLE process, HANDLE thread, DEBUG_EVENT *debug_event, co
 		else
 		{
 			//printf("Inner Got other ExceptionCode %u 0x%08X\n", debug_event2.dwDebugEventCode, debug_event2.u.Exception.ExceptionRecord.ExceptionCode);
-			if (!ContinueDebugEvent(debug_event2.dwProcessId, debug_event2.dwThreadId, DBG_CONTINUE))
+			if (!ContinueDebugEvent(debug_event2.dwProcessId, debug_event2.dwThreadId, DBG_EXCEPTION_NOT_HANDLED))
 			{
 				printf("Failed to continue debug event.\n");
 				return 1;
