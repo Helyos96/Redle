@@ -13,13 +13,32 @@ We do not offer prebuilt binaries.
 
 ## Building
 
-Dependencies:
-* [CryptoPP](https://github.com/weidai11/cryptopp) (tested with v8.7)
-
 Redle is cross-platform, although only compilation under Windows and Linux (Ubuntu) have been tested.
 Some tools, like the launcher and packet dumper, are Windows-only.
 
 Redle uses [`meson`](https://mesonbuild.com/Quick-guide.html) as its meta-build system.
+
+### Windows
+
+From the command line (open a "x64 Native Tools Command Prompt"):
+```
+meson setup builddir
+meson compile -C builddir
+```
+
+Or, generate Visual Studio solution files:
+```
+meson setup builddir --backend vs
+```
+
+You can then open `builddir/redle.sln`
+
+### Linux
+
+```
+meson setup builddir
+meson compile -C builddir
+```
 
 ## Using
 
@@ -27,7 +46,7 @@ Redle uses [`meson`](https://mesonbuild.com/Quick-guide.html) as its meta-build 
 ```
 127.0.0.1 lon01.login.pathofexile.com
 ```
-* Launch `redle.exe`
+* Launch `redle.exe` (make sure `dsa-private.key` is reachable by it)
 * Copy `launcher.exe` and `dsa-public.key` to the game's root folder.
 * Launch `launcher.exe`
 
