@@ -17,7 +17,6 @@
 
 #include "ByteBuffer.h"
 #include "MessageBuffer.h"
-#include "StringFormat.h"
 #include "utf8.h"
 #include <sstream>
 #include <cmath>
@@ -40,7 +39,7 @@ ByteBufferPositionException::ByteBufferPositionException(size_t pos, size_t size
 
 ByteBufferInvalidValueException::ByteBufferInvalidValueException(char const* type, char const* value)
 {
-    message().assign(Trinity::StringFormat("Invalid {} value ({}) found in ByteBuffer", type, value));
+    message().assign("Invalid Value");
 }
 
 ByteBuffer& ByteBuffer::operator>>(float& value)

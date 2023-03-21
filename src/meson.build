@@ -5,4 +5,4 @@ executable('redle',
 		   'Peer.cpp',
 		   'utils.cpp',
 		   'ByteBuffer.cpp',
-		   dependencies : [cryptopp, fmt_dep], include_directories : incdir)
+		   dependencies : [cryptopp], include_directories : incdir)
