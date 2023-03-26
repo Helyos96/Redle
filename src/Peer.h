@@ -12,6 +12,9 @@ using asio::ip::tcp;
 #include "Packet.h"
 #include "utils.h"
 
+class PeerLogin;
+extern PeerLogin *peerPtr;
+
 class Peer : public std::enable_shared_from_this<Peer> {
 public:
 	enum Status {
@@ -89,6 +92,9 @@ protected:
 							});
 					}
 					do_read();
+				} else {
+					printf("Error reading: %u (size %zu)\n", ec.value(), length);
+					socket_.close();
 				}
 			}
 		);
@@ -108,12 +114,38 @@ class PeerLogin : public Peer {
 public:
 	typedef std::shared_ptr<Peer> pointer;
 	static pointer create(asio::io_context& io_context) {
-		return pointer(new PeerLogin(io_context));
+		peerPtr = new PeerLogin(io_context);
+		return pointer(peerPtr);
 	}
+	void send_final() {
+		if (status_ == LoggedIn) {
+			printf("[LOGIN] Sending Disconnect Packet\n");
+			const u8 data[] = { 0x00, 0x14 };
+			Packet unk_15(0x15, data, sizeof(data));
+			std::vector<uint8_t> raw_packet = encrypt_packet(unk_15.data(), unk_15.size());
+			//auto self(shared_from_this());
+			asio::async_write(socket_, asio::buffer(raw_packet.data(), raw_packet.size()),
+				[/*this, self*/](std::error_code ec, std::size_t length) {
+					printf("ec = %d length = %zu\n", ec.value(), length);
+			});
+			status_ = None;
+		} else {
+			printf("[LOGIN] Closing Socket\n");
+			socket_.close();
+		}
+	}
+	void login(u32 account_id) {
+		status_ = LoggedIn;
+		printf("%p: status = %u\n", this, status_);
+		account_id_ = account_id;
+		peerPtr = this;
+	}
+	u32 get_account_id() { return account_id_; }
 protected:
-	PeerLogin(asio::io_context& io_context) : Peer(io_context, "LOGIN") {
+	PeerLogin(asio::io_context& io_context) : Peer(io_context, "LOGIN"), account_id_(0) {
 	}
 	ByteBuffer handle_packet(const std::vector<uint8_t> &data, std::size_t length) override;
+	u32 account_id_;
 };
 
 class PeerInstance : public Peer {

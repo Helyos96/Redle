@@ -7,8 +7,8 @@
 #include "LoginPackets.h"
 class Peer;
 
-ByteBuffer handle_edh_pubkey(Peer *peer, const C2S_EDH_PubKey *client_key);
-void handle_auth_data(Peer *peer);
-void handle_play_character(Peer *peer);
+ByteBuffer handle_edh_pubkey(PeerLogin *peer, const C2S_EDH_PubKey *client_key);
+void handle_auth_data(PeerLogin *peer);
+void handle_play_character(PeerLogin *peer);
 
 #endif

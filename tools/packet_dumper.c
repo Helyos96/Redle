@@ -1,7 +1,7 @@
 /**
  * Packet Dumper
  * It prints them in the same way that they are deserialized (sort of)
- * Note: Sometimes, big packets will be shown first in partial state, then in full.
+ * Note: Sometimes, client packets will be shown slightly before they were actually sent.
  */
 
 #include <Windows.h>
@@ -10,7 +10,7 @@
 #include <winuser.h>
 #include <stdint.h>
 
-DWORD get_process_id_by_name(const char *process_name)
+DWORD get_pid_by_name(const char *process_name)
 {
 	DWORD process_ids[1024], bytes_needed, num_processes;
 	if (!EnumProcesses(process_ids, sizeof(process_ids), &bytes_needed))
@@ -23,18 +23,15 @@ DWORD get_process_id_by_name(const char *process_name)
 	for (DWORD i = 0; i < num_processes; i++)
 	{
 		HANDLE process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, process_ids[i]);
-		if (process)
-		{
+		if (process) {
 			char name[MAX_PATH];
-			if (GetModuleBaseName(process, NULL, name, sizeof(name)))
-			{
+			if (GetModuleBaseName(process, NULL, name, sizeof(name))) {
 				if (strcmp(name, process_name) == 0)
 				{
 					CloseHandle(process);
 					return process_ids[i];
 				}
 			}
-
 			CloseHandle(process);
 		}
 	}
@@ -51,33 +48,36 @@ typedef struct Breakpoint
 
 const BYTE int3 = 0xCC;	// INT 3
 
+int write_memory(HANDLE process, LPVOID address, LPCVOID data, size_t len)
+{
+	DWORD old_protection;
+
+	if (!VirtualProtectEx(process, address, 1, PAGE_EXECUTE_READWRITE, &old_protection)) {
+		printf("Failed to set memory protection.\n");
+		return 0;
+	}
+	if (!WriteProcessMemory(process, address, data, len, NULL)) {
+		printf("Failed to write memory.\n");
+		return 0;
+	}
+	if (!VirtualProtectEx(process, address, 1, old_protection, &old_protection)) {
+		printf("Failed to set memory protection.\n");
+		return 0;
+	}
+
+	return 1;
+}
+
 Breakpoint set_breakpoint(HANDLE process, LPVOID address)
 {
 	Breakpoint bp = { .address = address };
 
-	DWORD old_protection;
-
-	if (!VirtualProtectEx(process, address, 1, PAGE_EXECUTE_READWRITE, &old_protection))
-	{
-		printf("Failed to set memory protection.\n");
-		return bp;
-	}
-
-	if (!ReadProcessMemory(process, address, &bp.old_instruction, 1, NULL))
-	{
+	if (!ReadProcessMemory(process, address, &bp.old_instruction, 1, NULL)) {
 		printf("Failed to read memory.\n");
 		return bp;
 	}
-
-	if (!WriteProcessMemory(process, address, &int3, 1, NULL))
-	{
+	if (!write_memory(process, address, &int3, 1)) {
 		printf("Failed to write memory.\n");
-		return bp;
-	}
-
-	if (!VirtualProtectEx(process, address, 1, old_protection, &old_protection))
-	{
-		printf("Failed to set memory protection.\n");
 		return bp;
 	}
 
@@ -90,42 +90,26 @@ int reset_breakpoint(HANDLE process, HANDLE thread, DEBUG_EVENT *debug_event, co
 	context.ContextFlags = CONTEXT_CONTROL;
 	if (!GetThreadContext(thread, &context)) {
 		printf("Failed to get thread context.\n");
-		return 1;
+		return 0;
 	}
 	// Move back one byte to re-execute the original instruction
 	context.Rip -= 1;
 	// Set the thread context to resume execution with a single step
 	context.EFlags |= 0x100;
-	if (!SetThreadContext(thread, &context))
-	{
+	if (!SetThreadContext(thread, &context)) {
 		printf("Failed to set thread context. Error %u\n", GetLastError());
-		return 1;
+		return 0;
 	}
 
 	// Rewrite the original instruction
-	DWORD old_protection;
-	if (!VirtualProtectEx(process, bp->address, 1, PAGE_EXECUTE_READWRITE, &old_protection))
-	{
-		printf("Failed to set memory protection.\n");
-		return 1;
+	if (!write_memory(process, bp->address, &bp->old_instruction, 1)) {
+		printf("Failed to write memory.\n");
+		return 0;
 	}
 
-	if (!WriteProcessMemory(process, bp->address, &bp->old_instruction, 1, NULL))
-	{
-		printf("Failed to restore original instruction.\n");
-		return 1;
-	}
-
-	if (!VirtualProtectEx(process, bp->address, 1, old_protection, &old_protection))
-	{
-		printf("Failed to set memory protection.\n");
-		return 1;
-	}
-
-	if (!ContinueDebugEvent(debug_event->dwProcessId, debug_event->dwThreadId, DBG_CONTINUE))
-	{
+	if (!ContinueDebugEvent(debug_event->dwProcessId, debug_event->dwThreadId, DBG_CONTINUE)) {
 		printf("Failed to continue debug event.\n");
-		return 1;
+		return 0;
 	}
 
 	DEBUG_EVENT debug_event2;
@@ -136,55 +120,42 @@ int reset_breakpoint(HANDLE process, HANDLE thread, DEBUG_EVENT *debug_event, co
 			debug_event2.u.Exception.ExceptionRecord.ExceptionCode == EXCEPTION_SINGLE_STEP)
 		{
 			// Rewrite the INT3 breakpoint
-			if (!VirtualProtectEx(process, bp->address, 1, PAGE_EXECUTE_READWRITE, &old_protection))
-			{
-				printf("Failed to set memory protection.\n");
-				return 1;
-			}
-
-			if (!WriteProcessMemory(process, bp->address, &int3, 1, NULL))
-			{
-				printf("Failed to rewrite breakpoint.\n");
-				return 1;
-			}
-
-			if (!VirtualProtectEx(process, bp->address, 1, old_protection, &old_protection))
-			{
-				printf("Failed to set memory protection.\n");
-				return 1;
+			if (!write_memory(process, bp->address, &int3, 1)) {
+				printf("Failed to write memory.\n");
+				return 0;
 			}
 
 			CONTEXT context_inner;
 			context_inner.ContextFlags = CONTEXT_CONTROL;
-			if (!GetThreadContext(thread, &context_inner))
-			{
+			if (!GetThreadContext(thread, &context_inner)) {
 				printf("Failed to get thread context_inner.\n");
-				return 1;
+				return 0;
 			}
 
 			// Clear the single step flag in the EFLAGS register
 			context_inner.EFlags &= ~0x100;
 
-			if (!SetThreadContext(thread, &context_inner))
-			{
+			if (!SetThreadContext(thread, &context_inner)) {
 				printf("Failed to set thread context_inner.\n");
-				return 1;
+				return 0;
 			}
 
 			break;
 		}
 		else
 		{
-			//printf("Inner Got other ExceptionCode %u 0x%08X\n", debug_event2.dwDebugEventCode, debug_event2.u.Exception.ExceptionRecord.ExceptionCode);
-			if (!ContinueDebugEvent(debug_event2.dwProcessId, debug_event2.dwThreadId, DBG_EXCEPTION_NOT_HANDLED))
-			{
+			// TODO: Preferably we really don't want to hit this.
+			// It could be another breakpoint hitting, or the same bp in another thread.
+			// These cases usually end up crashing the program.
+			//printf("Inner Got other ExceptionCode 0x%08X 0x%08X 0x%016llX\n", debug_event2.dwDebugEventCode, debug_event2.u.Exception.ExceptionRecord.ExceptionCode, debug_event2.u.Exception.ExceptionRecord.ExceptionAddress);
+			if (!ContinueDebugEvent(debug_event2.dwProcessId, debug_event2.dwThreadId, DBG_EXCEPTION_NOT_HANDLED)) {
 				printf("Failed to continue debug event.\n");
-				return 1;
+				return 0;
 			}
 		}
 	}
 
-	return 0;
+	return 1;
 }
 
 typedef struct StreamWatch {
@@ -198,6 +169,10 @@ void push_bytes(StreamWatch *sw, const unsigned char *bytes, size_t len) {
 	size_t i;
 
 	if (len == 0)
+		return;
+
+	// If first thing in a packet is longer than 2 bytes, doesn't look right.
+	if (len > 2 && sw->total_bytes == 0)
 		return;
 
 	if (len > 1 && sw->last_was_one)
@@ -219,19 +194,21 @@ void push_bytes(StreamWatch *sw, const unsigned char *bytes, size_t len) {
 void print_stream(StreamWatch *sw) {
 	printf("(%zu)\n", sw->total_bytes);
 	printf("%s\n", sw->buf);
+	if (sw->last_was_one)
+		printf("\n");
 	memset(sw, 0, sizeof(StreamWatch));
 }
 
 // TODO: magic signatures rather than hard offsets
 #define GET_BYTES_OFFSET 0x162c6d2
-#define DESERIALISE_OFFSET 0x1AE4710
+#define DESERIALISE_OFFSET 0x1AE48AA
 
 #define WRITE_BYTES_OFFSET 0x162C700
 #define SEND_PACKET_OFFSET 0x162C860
 
 int main()
 {
-	DWORD pid = get_process_id_by_name("PathOfExile.exe");
+	DWORD pid = get_pid_by_name("PathOfExile.exe");
 	if (!pid)
 	{
 		printf("Failed to get PID %u\n", pid);
@@ -355,16 +332,25 @@ int main()
 					}
 					else if (debug_event.u.Exception.ExceptionRecord.ExceptionAddress == bp_deserialize.address)
 					{
-						if (read_stream.total_bytes > 0) {
-							printf("Server -> Client ");
-							print_stream(&read_stream);
-							printf("\n");
-						}
-
 						HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, debug_event.dwThreadId);
 						if (!thread) {
 							printf("Failed to open thread.\n");
 							return 1;
+						}
+
+						CONTEXT context;
+						context.ContextFlags = CONTEXT_INTEGER;
+						if (!GetThreadContext(thread, &context)) {
+							printf("Failed to get thread context.\n");
+							return 1;
+						}
+
+						if (context.Rax & 1) {
+							printf("Server -> Client ");
+							print_stream(&read_stream);
+							printf("\n");
+						} else {
+							memset(&read_stream, 0, sizeof(read_stream));
 						}
 
 						reset_breakpoint(process, thread, &debug_event, &bp_deserialize);

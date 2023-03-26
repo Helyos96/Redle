@@ -8,5 +8,6 @@
 class Peer;
 
 void handle_instance_login(Peer *peer);
+void handle_hashes(Peer *peer);
 
 #endif

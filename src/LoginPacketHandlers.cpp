@@ -33,7 +33,7 @@ static void LoadPrivateKey(const string& filename, PrivateKey& key)
 	key.Load(queue);	
 }
 
-ByteBuffer handle_edh_pubkey(Peer *peer, const C2S_EDH_PubKey *client_key) {
+ByteBuffer handle_edh_pubkey(PeerLogin *peer, const C2S_EDH_PubKey *client_key) {
 	static const Integer p_eph("0xc5d1fff6e1e0b5b5a4220a369a4f504d59c7482724053c0d4b05426328031633bc79249c1c58c91b32e6802f20a1e7626859da201e7faad8406c702796cbdf3208a6cccb77baa29bec763a9a1fb868d79182f00957e890d762806b443e7fd2f75ef2eed5f56e92e5939ec15533a642b2212504b62ba72ca8e6c7fe28bbc8f687");
 	static const Integer g_eph("0x2");
 	static const Integer q_eph("0x62e8fffb70f05adad211051b4d27a826ace3a41392029e06a582a13194018b19de3c924e0e2c648d997340179050f3b1342ced100f3fd56c20363813cb65ef9904536665bbdd514df63b1d4d0fdc346bc8c17804abf4486bb14035a21f3fe97baf79776afab74972c9cf60aa99d321591092825b15d396547363ff145de47b43");
@@ -98,7 +98,9 @@ ByteBuffer handle_edh_pubkey(Peer *peer, const C2S_EDH_PubKey *client_key) {
 	return packet;
 }
 
-void handle_auth_data(Peer *peer) {
+void handle_auth_data(PeerLogin *peer) {
+	peer->login(1);
+
 	S2C_Unk_0x04 unk;
 	S2C_Char_List cl;
 	S2C_League_List ll;
@@ -108,8 +110,8 @@ void handle_auth_data(Peer *peer) {
 	peer->send_packet(ll);
 }
 
-void handle_play_character(Peer *peer) {
-	S2C_Instance_Info ii;
+void handle_play_character(PeerLogin *peer) {
+	S2C_Instance_Info ii(peer->get_account_id());
 
 	peer->send_packet(ii);
 }

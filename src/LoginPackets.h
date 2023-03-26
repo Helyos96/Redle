@@ -6,7 +6,7 @@
 #include "Packet.h"
 #include "types.h"
 
-enum Opcodes : u16 {
+enum OpcodesLogin : u16 {
 	C2S_HEARTBEAT = 0x01,
 	EDH_PUBKEY = 0x02,
 	C2S_AUTH_DATA = 0x03,
@@ -49,10 +49,10 @@ public:
 	S2C_Char_List() : Packet(S2C_CHARACTER_LIST) {
 		buffer << (u8)1; // Character count
 
-		buffer << "TestChar";
+		buffer << "TestCha";
 		buffer << "Standard";
 		buffer << (u16)0x0204;
-		buffer << (u8)100; // level
+		buffer << (u8)101; // level
 		buffer << (u8)0xB9;
 		buffer << (u32)0xa2bd34c4;
 		buffer << (u16)0;
@@ -100,10 +100,10 @@ public:
 
 class S2C_Instance_Info : public Packet {
 public:
-	S2C_Instance_Info() : Packet(S2C_INSTANCE_INFO) {
-		buffer << (u32)0x00000001; // Token? Echoed in OpcodesInstance::C2S_LOGIN
-		buffer << (u16)0x235C;
-		buffer << (u32)0x00000002; // Another Token? Echoed in OpcodesInstance::C2S_LOGIN
+	S2C_Instance_Info(u32 account_id) : Packet(S2C_INSTANCE_INFO) {
+		buffer << (u32)account_id; // Unsure. Echoed in OpcodesInstance::C2S_LOGIN. Not static.
+		buffer << (u16)0x7AD2; // Area Code - 0x7AD2 = The Coast
+		buffer << (u32)0x00000002; // Token? Echoed in OpcodesInstance::C2S_LOGIN.  Not static.
 		buffer << (u8)1;
 		buffer << (u16)0x200;
 		buffer << (u16)6112; // port
