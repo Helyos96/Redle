@@ -101,11 +101,11 @@ ByteBuffer handle_edh_pubkey(PeerLogin *peer, const C2S_EDH_PubKey *client_key) 
 void handle_auth_data(PeerLogin *peer) {
 	peer->login(1);
 
-	S2C_Unk_0x04 unk;
+	S2C_Account_Name an;
 	S2C_Char_List cl;
 	S2C_League_List ll;
 	
-	peer->send_packet(unk);
+	peer->send_packet(an);
 	peer->send_packet(cl);
 	peer->send_packet(ll);
 }

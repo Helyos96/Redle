@@ -6,18 +6,27 @@
 
 enum OpcodesInstance : u16 {
 	C2S_LOGIN = 0x03,
+	C2S_UNK_0x0E = 0x0E,
+	C2S_CLICK_ITEM = 0x1B,
 	C2S_ALLOCATE_SKILL_POINT = 0x26,
+	C2S_ALLOCATE_ATLAS_SKILL_POINT = 0x2D,
+	C2S_BIND_SKILL = 0x3C,
+	C2S_USE_FLASK = 0x4F,
 	C2S_HASHES = 0x5A,
+	C2S_EXIT_CHARACTER_SELECT = 0x108,
 	C2S_FINISHED_LOADING = 0x10F, // maybe it's 0x72 or 0x184
+	C2S_USE_SKILL = 0x139, // This includes left click
+	C2S_MOUSE_DRAGGED = 0x13D,
+	C2S_SKILL_RELEASED = 0x13F, // Also includes left click
 
-	S2C_START_ENCRYPTING = 0x05, // Unsure. First packet sent. Seems optional.
+	S2C_START_ENCRYPTING = 0x05, // First packet sent. Seems optional.
 	S2C_CHAT_MESSAGE = 0x0A,
 	S2C_UNK_0x0B = 0x0B,
 	S2C_UNK_0x0F = 0x0F,
 	S2C_AREA_INFO = 0x10,
 	S2C_PRELOAD_MONSTER_LIST = 0x13,
 	S2C_UNK_0x14 = 0x14, // Last packet before client is done loading
-	S2C_PLAYER_ID = 0x15, // Unsure
+	S2C_PLAYER_ID = 0x15,
 	S2C_NEW_INSTANCE_INFO = 0x1A, // Same packet structure as S2C_INSTANCE_INFO (login)
 	S2C_UNK_0x25 = 0x25,
 	S2C_UNK_0x2C = 0x2C,
