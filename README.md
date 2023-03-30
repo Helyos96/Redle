@@ -2,10 +2,11 @@
 
 Redle is a generic ARPG server software.
 
-## What works
+## What works (3.20.2b)
 
 * Handshaking and setting up the crypto stuff with the game client.
 * Logging in and displaying character list
+* Entering world instance
 * Packet dumping tool
 * Custom launcher tool
 
@@ -18,7 +19,7 @@ We do not offer prebuilt binaries.
 Redle is cross-platform, although only compilation under Windows and Linux (Ubuntu) have been tested.
 Some tools, like the launcher and packet dumper, are Windows-only.
 
-Redle uses [`meson`](https://mesonbuild.com/Quick-guide.html) as its meta-build system.
+Redle uses [`meson`](https://mesonbuild.com/Quick-guide.html) as its meta-build system. By default, it generates [ninja](https://ninja-build.org/) build files.
 
 ### Windows
 
