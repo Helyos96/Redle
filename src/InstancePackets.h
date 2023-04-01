@@ -6,23 +6,27 @@
 
 enum OpcodesInstance : u16 {
 	C2S_LOGIN = 0x03,
-	C2S_UNK_0x0E = 0x0E,
+	C2S_CHAT_MESSAGE = 0x08,
+	C2S_HNC_CHALLENGE = 0x0E,
 	C2S_CLICK_ITEM = 0x1B,
 	C2S_ALLOCATE_SKILL_POINT = 0x26,
 	C2S_ALLOCATE_ATLAS_SKILL_POINT = 0x2D,
 	C2S_BIND_SKILL = 0x3C,
 	C2S_USE_FLASK = 0x4F,
 	C2S_HASHES = 0x5A,
+	C2S_CHANGE_GLOBAL_CHAT = 0xEB,
 	C2S_EXIT_CHARACTER_SELECT = 0x108,
 	C2S_FINISHED_LOADING = 0x10F, // maybe it's 0x72 or 0x184
 	C2S_USE_SKILL = 0x139, // This includes left click
 	C2S_MOUSE_DRAGGED = 0x13D,
 	C2S_SKILL_RELEASED = 0x13F, // Also includes left click
+	C2S_OPEN_WORLD_PANE = 0x145,
+	C2S_FINISHED_LOADING_2 = 0x184, // maybe it's 0x72 or 0x10F
 
 	S2C_START_ENCRYPTING = 0x05, // First packet sent. Seems optional.
 	S2C_CHAT_MESSAGE = 0x0A,
 	S2C_UNK_0x0B = 0x0B,
-	S2C_UNK_0x0F = 0x0F,
+	S2C_HNC_RESPONSE = 0x0F,
 	S2C_AREA_INFO = 0x10,
 	S2C_PRELOAD_MONSTER_LIST = 0x13,
 	S2C_UNK_0x14 = 0x14, // Last packet before client is done loading
@@ -36,8 +40,10 @@ enum OpcodesInstance : u16 {
 	S2C_UNK_0x8B = 0x8B,
 	S2C_UNK_0x8C = 0x8C,
 	S2C_FRIEND_LIST_ENTRY_2 = 0x95,
+	S2C_UNK_0xD5 = 0xD5,
 	S2C_UNK_0xEC = 0xEC,
 	S2C_UNK_0x14D = 0x14D,
+	S2C_PLAYER_ID_2 = 0x185,
 	S2C_UNK_0x188 = 0x188,
 	S2C_SKILL_GEM = 0x191,
 	S2C_UNK_0x1B6 = 0x1B6,
@@ -111,6 +117,15 @@ public:
 	}
 };
 
+class S2C_Player_Id_2 : public Packet {
+public:
+	S2C_Player_Id_2() : Packet(S2C_PLAYER_ID_2) {
+		buffer << (u32)PLAYER_ID;
+		buffer << (u32)0;
+		buffer << (u16)0;
+	}
+};
+
 class S2C_Add_Object : public Packet {
 public:
 	S2C_Add_Object() : Packet(S2C_ADD_OBJECT) {
@@ -143,6 +158,21 @@ public:
 		buffer << (u8)1;
 		buffer << (u8)1;
 		buffer << (u8)0;
+	}
+};
+
+class S2C_Hnc_Response : public Packet {
+public:
+	S2C_Hnc_Response(u16 arg1, u32 arg2) : Packet(S2C_HNC_RESPONSE) {
+		buffer << arg1;
+		buffer << arg2;
+	}
+};
+
+class S2C_Unk_0xD5 : public Packet {
+public:
+	S2C_Unk_0xD5() : Packet(S2C_UNK_0xD5) {
+		buffer << (u16)0;
 	}
 };
 

@@ -10,6 +10,8 @@
 #include <winuser.h>
 #include <stdint.h>
 
+#include "shared.h"
+
 DWORD get_pid_by_name(const char *process_name)
 {
 	DWORD process_ids[1024], bytes_needed, num_processes;
@@ -199,12 +201,10 @@ void print_stream(StreamWatch *sw) {
 	memset(sw, 0, sizeof(StreamWatch));
 }
 
-// TODO: magic signatures rather than hard offsets
-#define GET_BYTES_OFFSET 0x162c6d2
-#define DESERIALISE_OFFSET 0x1AE48AA
-
-#define WRITE_BYTES_OFFSET 0x162C700
-#define SEND_PACKET_OFFSET 0x162C860
+const uint8_t get_bytes_sig[] = { 0x2B, 0xC6, 0xE8, 0xC9, 0xBD, 0xAD, 0x00, 0x48, 0x01, 0xBB, 0xA8, 0x01, 0x00, 0x00, 0x48, 0x8B };
+const uint8_t deserialise_sig[] = { 0x8B, 0x6B, 0x30, 0x49, 0x8B, 0xE3, 0x41, 0x5E, 0x5F, 0x5E, 0xC3, 0x0F, 0xB7, 0xD6, 0x48, 0x8D };
+const uint8_t write_bytes_sig[] = { 0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x57, 0x48, 0x83, 0xEC, 0x40, 0x48, 0x8D, 0xB1, 0xB0, 0x01, 0x00, 0x00, 0x49, 0x8B, 0xF8, 0x4C, 0x8B };
+const uint8_t send_packet_sig[] = { 0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x55, 0x57, 0x41, 0x56, 0x48, 0x8D, 0xAC, 0x24, 0x30, 0xFD, 0xFF, 0xFF, 0x48, 0x81, 0xEC, 0xD0, 0x03, 0x00, 0x00, 0x8B, 0xF2, 0x48 };
 
 int main()
 {
@@ -221,35 +221,41 @@ int main()
 	StreamWatch read_stream = { 0 };
 	StreamWatch write_stream = { 0 };
 
-	// Retrieve the process' base address
-	MODULEINFO module_info;
-	HMODULE module_handle;
-	if (!EnumProcessModules(process, &module_handle, sizeof(module_handle), &lpcbNeeded))
-	{
-		printf("Failed to retrieve module handle. Error %u\n", GetLastError());
-		return 1;
-	}
-
-	if (!GetModuleInformation(process, module_handle, &module_info, sizeof(module_info)))
-	{
-		printf("Failed to retrieve module information.\n");
-		return 1;
-	}
-
-	printf("Process base address: %p\n", module_info.lpBaseOfDll);
-
-	if (!DebugActiveProcess(pid))
-	{
+	if (!DebugActiveProcess(pid)) {
 		printf("Failed to attach debugger to process %d.\n", pid);
 		return 1;
 	}
 
 	printf("Debugger attached to process %d.\n", pid);
 
-	Breakpoint bp_get_bytes = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + GET_BYTES_OFFSET));
-	Breakpoint bp_deserialize = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + DESERIALISE_OFFSET));
-	Breakpoint bp_write_bytes = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + WRITE_BYTES_OFFSET));
-	Breakpoint bp_send_packet = set_breakpoint(process, (LPVOID)((char*) module_info.lpBaseOfDll + SEND_PACKET_OFFSET));
+	char *match = find_addr(process, get_bytes_sig, sizeof(get_bytes_sig), 16, PAGE_EXECUTE_READ);
+	if (!match) {
+		printf("Couldn't find address for get_bytes\n");
+		return 1;
+	}
+	Breakpoint bp_get_bytes = set_breakpoint(process, (LPVOID)(match + 2));
+
+
+	match = find_addr(process, deserialise_sig, sizeof(deserialise_sig), 16, PAGE_EXECUTE_READ);
+	if (!match) {
+		printf("Couldn't find address for deserialise\n");
+		return 1;
+	}
+	Breakpoint bp_deserialize = set_breakpoint(process, (LPVOID)(match + 10));
+
+	match = find_addr(process, write_bytes_sig, sizeof(write_bytes_sig), 16, PAGE_EXECUTE_READ);
+	if (!match) {
+		printf("Couldn't find address for write_bytes\n");
+		return 1;
+	}
+	Breakpoint bp_write_bytes = set_breakpoint(process, (LPVOID)match);
+
+	match = find_addr(process, send_packet_sig, sizeof(send_packet_sig), 16, PAGE_EXECUTE_READ);
+	if (!match) {
+		printf("Couldn't find address for send_packet\n");
+		return 1;
+	}
+	Breakpoint bp_send_packet = set_breakpoint(process, (LPVOID)match);
 
 	// Wait for breakpoint
 	DEBUG_EVENT debug_event;

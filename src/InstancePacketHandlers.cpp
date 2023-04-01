@@ -152,3 +152,20 @@ void handle_hashes(Peer *peer) {
 	}
 	peer->send_packet(unk_14);
 }
+
+void handle_finished_loading(Peer *peer) {
+	S2C_Player_Id_2 pi2;
+	S2C_Unk_0xD5 unk_d5;
+	Packet tick(S2C_TICK);
+
+	// Sending these doesn't seem to change anything so far.
+	peer->send_packet(unk_d5);
+	peer->send_packet(pi2);
+	peer->send_packet(tick);
+}
+
+void handle_hnc_challenge(Peer *peer) {
+	// Crashes the game if you send the wrong values.
+	//S2C_Hnc_Response ans(1, 1);
+	//peer->send_packet(ans);
+}

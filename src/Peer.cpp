@@ -46,6 +46,12 @@ ByteBuffer PeerInstance::handle_packet(const std::vector<uint8_t> &data, std::si
 	case C2S_HASHES:
 		handle_hashes(this);
 		break;
+	case C2S_FINISHED_LOADING_2:
+		handle_finished_loading(this);
+		break;
+	case C2S_HNC_CHALLENGE:
+		handle_hnc_challenge(this);
+		break;
 	default:
 		printf("Unhandled instance opcode: 0x%X\n", opcode);
 	}
