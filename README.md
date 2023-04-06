@@ -2,7 +2,7 @@
 
 Redle is a generic ARPG server software.
 
-## What works (3.20.2c)
+## What works (3.20.2d)
 
 * Handshaking and setting up the crypto stuff with the game client.
 * Logging in and displaying character list
