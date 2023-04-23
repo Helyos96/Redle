@@ -236,7 +236,6 @@ int main()
 	}
 	Breakpoint bp_get_bytes = set_breakpoint(process, (LPVOID)(match + 2));
 
-
 	match = find_addr(process, deserialise_sig, sizeof(deserialise_sig), 16, PAGE_EXECUTE_READ);
 	if (!match) {
 		printf("Couldn't find address for deserialise\n");

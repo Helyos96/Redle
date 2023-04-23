@@ -2,12 +2,12 @@
 
 Redle is a generic ARPG server software.
 
-## What works (3.20.2d)
+## What works (3.21.0c)
 
 * Handshaking and setting up the crypto stuff with the game client.
 * Logging in and displaying character list
 * ~~Entering world instance~~
-* Packet dumping tool
+* ~~Packet dumping tool~~
 * Custom launcher tool
 
 ## No downloads
@@ -52,4 +52,4 @@ meson compile -C builddir
 * Launch `redle.exe` (make sure `dsa-private.key` is reachable by it)
 * Copy `launcher.exe` and `dsa-public.key` to the game's root folder.
 * Launch `launcher.exe`
-
+* Select London server (this is tied to lon01.login.pathofexile.com)
